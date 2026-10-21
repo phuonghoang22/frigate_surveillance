@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt_broker
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    container_name: frigate
+    privileged: true
+    restart: unless-stopped
+    shm_size: "128mb"
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./frigate/config:/config
+      - ./frigate/storage:/media/frigate
+      - type: tmpfs
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    ports:
+      - "5000:5000"
+      - "8554:8554"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    environment:
+      FRIGATE_RTSP_PASSWORD: "password"
+    depends_on:
+      - mqtt
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: frigate_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mqtt-worker:
+    build: ./mqtt_worker
+    container_name: mqtt-python-service
+    restart: unless-stopped
+    environment:
+      MQTT_BROKER: mqtt
+      MQTT_PORT: 1883
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: frigate_db
+      DB_USER: admin
+      DB_PASS: password123
+    depends_on:
+      - mqtt
+      - postgres
+
+  backend-api:
+    build: ./backend
+    container_name: backend_api_service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: frigate_db
+      DB_USER: admin
+      DB_PASSWORD: password123
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:

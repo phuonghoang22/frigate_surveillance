@@ -1,0 +1,8 @@
+{
+    "camera_name": "string",
+    "rtsp_url": "string",
+    "objects": [
+        "string"
+    ],
+    "min_score": 0.0
+}

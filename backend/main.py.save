@@ -1,0 +1,58 @@
+from fastapi import FastAPI, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+app = FastAPI(title="Frigate Events Backend API", version="1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DB_CONFIG = {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "dbname": "frigate_db",
+    "user": "admin",
+    "password": "password123"
+}
+
+def get_db():
+    return psycopg2.connect(**DB_CONFIG, cursor_factory=RealDictCursor)
+
+@app.get("/")
+def read_root():
+    return {"status": "success", "message": "Backend API is running"}
+
+@app.get("/api/events")
+def get_events(limit: int = Query(10, ge=1, le=100)):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM get_recent_events(%s);", (limit,))
+        events = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return {"total": len(events), "data": events}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/stats")
+def get_stats():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM get_event_stats();")
+        stats = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return {"data": stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=st
+
+
+

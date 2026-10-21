@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.log
+node_modules/
+postgres_data/
+frigate/storage/
+frigate/media/
+frigate/clips/
+frigate/recordings/
+frigate/exports/
+frigate/*.db*
+*.mp4
+*.webp
+*.jpg
+*.db*

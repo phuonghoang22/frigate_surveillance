@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Giám Sát</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #111214;
+            --panel-bg: #18191c;
+            --header-box: #2b2d31;
+            --btn-box: #404249;
+            --btn-active: #007aff;
+            --border-line: #26272b;
+            --text-primary: #f2f3f5;
+            --text-sub: #949ba4;
+        }
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
+        .layout-wrapper {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+        /* Khu vực Camera bên trái */
+        .left-workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 14px 18px;
+            gap: 12px;
+            overflow-y: auto;
+        }
+        .video-box {
+            background: #000;
+            border-radius: 12px;
+            border: 1px solid var(--border-line);
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+            min-height: 420px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+        }
+        .video-box iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .live-indicator {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            background: rgba(220, 38, 38, 0.9);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 10;
+        }
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            background: #fff;
+            border-radius: 50%;
+            animation: blink 1.4s infinite;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+        .stat-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-line);
+            border-radius: 10px;
+            padding: 12px 16px;
+        }
+
+        /* CỘT SỰ KIỆN BÊN PHẢI */
+        .right-events-drawer {
+            width: 410px;
+            flex-shrink: 0;
+            background-color: var(--panel-bg);
+            border-left: 1px solid var(--border-line);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+            user-select: none;
+        }
+        /* Thanh icon góc trên (Chỉ giữ Cấu hình & Làm mới) */
+        .drawer-top-icons {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 22px;
+            padding: 12px 20px 6px 20px;
+            color: #d1d5db;
+            font-size: 17px;
+        }
+        .drawer-top-icons i {
+            cursor: pointer;
+            transition: color 0.15s, transform 0.15s;
+        }
+        .drawer-top-icons i:hover {
+            color: #ffffff;
+            transform: scale(1.1);
+        }
+
+        /* Khối xám nổi chứa Tiêu đề Sự Kiện & 5 Icon lọc thực tế */
+        .filter-panel-card {
+            background-color: var(--header-box);
+            margin: 4px 10px 8px 10px;
+            padding: 10px 12px 12px 12px;
+            border-radius: 14px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+            z-index: 20;
+        }
+        .mode-header {
+            background-color: #3f4147;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-align: center;
+            padding: 7px 0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+        }
+
+        /* Lưới 1 hàng x 5 cột nút icon thực tế */
+        .icon-filter-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+        .icon-chip {
+            height: 32px;
+            background-color: var(--btn-box);
+            border: none;
+            border-radius: 7px;
+            color: #ffffff;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .icon-chip:hover {
+            background-color: #52555e;
+        }
+        .icon-chip.active {
+            background-color: var(--btn-active);
+            color: #ffffff;
+        }
+
+        /* Danh sách cuộn các sự kiện */
+        .events-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 95px;
+        }
+        .events-scroll-area::-webkit-scrollbar { width: 5px; }
+        .events-scroll-area::-webkit-scrollbar-thumb { background: #3f4147; border-radius: 4px; }
+
+        /* Từng dòng sự kiện */
+        .scrypted-event-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 13px 16px;
+            border-bottom: 1px solid var(--border-line);
+            cursor: pointer;
+            position: relative;
+            transition: background 0.15s;
+        }
+        .scrypted-event-row:hover, .scrypted-event-row.selected {
+            background-color: rgba(255, 255, 255, 0.04);
+        }
+
+        /* Vạch ngang màu xanh dương khi chọn/rê chuột */
+        .scrypted-event-row .blue-playhead-line {
+            display: none;
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 2px;
+            background-color: #0a84ff;
+            z-index: 12;
+            pointer-events: none;
+        }
+        .scrypted-event-row .blue-playhead-badge {
+            display: none;
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #0a84ff;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.25;
+            padding: 4px 9px;
+            border-radius: 6px;
+            text-align: center;
+            z-index: 13;
+            box-shadow: 0 2px 8px rgba(10, 132, 255, 0.5);
+            pointer-events: none;
+        }
+        .scrypted-event-row:hover .blue-playhead-line,
+        .scrypted-event-row:hover .blue-playhead-badge,
+        .scrypted-event-row.selected .blue-playhead-line,
+        .scrypted-event-row.selected .blue-playhead-badge {
+            display: block;
+        }
+
+        .ev-left-info {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            padding-right: 10px;
+        }
+        .ev-cam-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .ev-time-str {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #e5e7eb;
+        }
+        .ev-duration-str {
+            font-size: 13px;
+            color: var(--text-sub);
+            margin-top: 1px;
+        }
+        .ev-type-icons {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            color: var(--text-sub);
+            font-size: 15px;
+        }
+
+        .ev-right-thumb {
+            width: 168px;
+            height: 94px;
+            border-radius: 10px;
+            object-fit: cover;
+            background-color: #0c0d0e;
+            flex-shrink: 0;
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+
+        /* 2 Nút Nổi Góc Dưới Trái (Trực tiếp & Chọn Ngày) */
+        .floating-bottom-controls {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 30;
+        }
+        .pill-live-btn {
+            background-color: #f8fafc;
+            color: #0f172a;
+            border: none;
+            border-radius: 24px;
+            padding: 7px 16px;
+            font-size: 13.5px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+        .pill-live-btn:hover { transform: translateY(-1px); background: #ffffff; }
+        .pill-live-btn i { color: #dc2626; font-size: 13px; }
+
+        .pill-date-btn {
+            background-color: #0a84ff;
+            color: #ffffff;
+            border: none;
+            border-radius: 24px;
+            padding: 7px 16px;
+            font-size: 13.5px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(10, 132, 255, 0.4);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .pill-date-btn:hover { background-color: #0070e0; }
+        .hidden-date-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="layout-wrapper">
+    <!-- KHU VỰC TRÁI: VIDEO TRỰC TIẾP & THỐNG KÊ -->
+    <div class="left-workspace">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="m-0 fw-bold"><i class="fa-solid fa-shield-halved text-primary me-2"></i>Camera Giám Sát</h5>
+            <span class="text-secondary small" id="currentDateLabel"></span>
+        </div>
+
+        <div class="video-box">
+            <div class="live-indicator"><div class="live-dot"></div> TRỰC TIẾP</div>
+            <iframe id="liveStreamFrame" src="http://172.16.0.201:5000"></iframe>
+        </div>
+
+        <div class="row g-2">
+            <div class="col-md-4">
+                <div class="stat-card d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-secondary small fw-bold">SỰ KIỆN TRONG NGÀY</div>
+                        <h3 class="m-0 fw-bold text-info mt-1" id="totalEventsCount">0</h3>
+                    </div>
+                    <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>PostgreSQL Active</span>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="stat-card d-flex justify-content-between align-items-center h-100">
+                    <div>
+                        <div class="text-secondary small fw-bold">TRẠNG THÁI NHẬN DIỆN</div>
+                        <div class="small text-light mt-1">Bấm vào từng sự kiện bên phải để xem lại Video Clip hoặc Ảnh chụp chi tiết.</div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-info text-nowrap" id="btnOpenConfigMain">
+                        <i class="fa-solid fa-gear me-1"></i>Cấu hình Camera
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CỘT PHẢI: GIAO DIỆN SỰ KIỆN ĐÃ LỌC GỌN -->
+    <div class="right-events-drawer">
+        <!-- Hàng icon góc trên cùng: Cấu hình Camera & Tải lại -->
+        <div class="drawer-top-icons">
+            <i class="fa-solid fa-gear" id="btnOpenConfigTop" title="Cấu hình Camera"></i>
+            <i class="fa-solid fa-rotate-right" id="btnRefreshEvents" title="Làm mới sự kiện"></i>
+        </div>
+
+        <!-- Khung Sự kiện & 5 nút lọc đối tượng thực tế -->
+        <div class="filter-panel-card">
+            <div class="mode-header">SỰ KIỆN</div>
+
+            <div class="icon-filter-grid">
+                <button class="icon-chip active" onclick="filterByLabel('all', this)" title="Tất cả">
+                    <i class="fa-solid fa-people-group"></i>
+                </button>
+                <button class="icon-chip" onclick="filterByLabel('person', this)" title="Người (Person)">
+                    <i class="fa-solid fa-person-walking"></i>
+                </button>
+                <button class="icon-chip" onclick="filterByLabel('dog', this)" title="Chó / Thú cưng (Dog)">
+                    <i class="fa-solid fa-paw"></i>
+                </button>
+                <button class="icon-chip" onclick="filterByLabel('car', this)" title="Ô tô (Car)">
+                    <i class="fa-solid fa-car"></i>
+                </button>
+                <button class="icon-chip" onclick="filterByLabel('motorcycle', this)" title="Xe máy (Motorcycle)">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Danh sách sự kiện -->
+        <div class="events-scroll-area" id="eventList">
+            <div class="text-center text-secondary py-5 small">Đang tải danh sách sự kiện...</div>
+        </div>
+
+        <!-- 2 Nút Nổi Góc Dưới (Trực tiếp & Lịch Ngày/Tháng) -->
+        <div class="floating-bottom-controls">
+            <button class="pill-live-btn" id="btnScrollLive" title="Về sự kiện mới nhất hôm nay">
+                <i class="fa-solid fa-arrow-up"></i> Trực tiếp
+            </button>
+            <div class="pill-date-btn" title="Bấm để chọn ngày xem lại">
+                <i class="fa-regular fa-calendar-days"></i>
+                <span id="datePillText">16/10</span>
+                <input type="date" id="eventDatePicker" class="hidden-date-input">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CẤU HÌNH CAMERA -->
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="fa-solid fa-sliders text-info me-2"></i>Cấu hình Camera</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="configAlert" class="alert d-none py-2"></div>
+                <div class="mb-3">
+                    <label class="form-label small text-secondary">Tên hiển thị Camera</label>
+                    <input type="text" id="cfgCamName" class="form-control bg-secondary text-white border-dark">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-secondary">RTSP Stream URL</label>
+                    <input type="text" id="cfgRtspUrl" class="form-control bg-secondary text-white border-dark">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-secondary d-flex justify-content-between">
+                        <span>Độ tin cậy tối thiểu</span>
+                        <span class="text-info fw-bold" id="cfgScoreVal">70%</span>
+                    </label>
+                    <input type="range" class="form-range" id="cfgMinScore" min="0.5" max="0.95" step="0.05" value="0.7">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small text-secondary">Đối tượng theo dõi</label>
+                    <div class="row g-2">
+                        <div class="col-6"><div class="form-check"><input class="form-check-input cfg-obj" type="checkbox" value="person" id="objPerson"><label class="form-check-label" for="objPerson">Người (person)</label></div></div>
+                        <div class="col-6"><div class="form-check"><input class="form-check-input cfg-obj" type="checkbox" value="car" id="objCar"><label class="form-check-label" for="objCar">Ô tô (car)</label></div></div>
+                        <div class="col-6"><div class="form-check"><input class="form-check-input cfg-obj" type="checkbox" value="motorcycle" id="objMotorcycle"><label class="form-check-label" for="objMotorcycle">Xe máy (motorcycle)</label></div></div>
+                        <div class="col-6"><div class="form-check"><input class="form-check-input cfg-obj" type="checkbox" value="dog" id="objDog"><label class="form-check-label" for="objDog">Thú cưng (dog)</label></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSaveConfig">Lưu cấu hình</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL XEM VIDEO CLIP & SNAPSHOT -->
+<div class="modal fade" id="snapshotModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h6 class="modal-title fw-bold" id="modalTitle">Chi tiết sự kiện</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="stopClip()"></button>
+            </div>
+            <div class="modal-body p-3">
+                <ul class="nav nav-pills mb-3 gap-2">
+                    <li class="nav-item">
+                        <button class="nav-link active btn-sm py-1 px-3" id="tabBtnSnap" onclick="toggleMedia('snap')"><i class="fa-regular fa-image me-1"></i>Ảnh chụp</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link btn-sm py-1 px-3" id="tabBtnClip" onclick="toggleMedia('clip')"><i class="fa-solid fa-film me-1"></i>Video Clip (.mp4)</button>
+                    </li>
+                </ul>
+                <div class="text-center bg-black rounded overflow-hidden">
+                    <img id="modalImg" src="" style="width: 100%; max-height: 460px; object-fit: contain;">
+                    <video id="modalVideo" controls style="width: 100%; max-height: 460px; display: none;"></video>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 small text-secondary" id="modalMeta"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const datePicker = document.getElementById('eventDatePicker');
+    const datePillText = document.getElementById('datePillText');
+    const eventList = document.getElementById('eventList');
+    const totalEventsCount = document.getElementById('totalEventsCount');
+
+    let rawEvents = [];
+    let activeLabel = 'all';
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    datePicker.value = todayStr;
+    updateDatePillLabel(todayStr);
+
+    function updateDatePillLabel(dateStr) {
+        if (!dateStr) return;
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            datePillText.textContent = `${parts[2]}/${parts[1]}`;
+            document.getElementById('currentDateLabel').textContent = `Ngày xem: ${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+    }
+
+    function formatDuration(sec) {
+        const s = parseInt(sec, 10) || 12;
+        if (s < 60) return `${s} giây`;
+        const m = Math.floor(s / 60);
+        const rem = s % 60;
+        return rem > 0 ? `${m} phút ${rem} giây` : `${m} phút`;
+    }
+
+    function getObjectIcon(label) {
+        const l = (label || '').toLowerCase();
+        if (l === 'person') return '<i class="fa-solid fa-person-walking"></i>';
+        if (l === 'car') return '<i class="fa-solid fa-car"></i>';
+        if (l === 'motorcycle' || l === 'bicycle') return '<i class="fa-solid fa-motorcycle"></i> <i class="fa-solid fa-person-walking"></i>';
+        if (l === 'dog' || l === 'cat') return '<i class="fa-solid fa-paw"></i>';
+        return '<i class="fa-solid fa-person-walking"></i>';
+    }
+
+    function loadEvents(dateStr) {
+        updateDatePillLabel(dateStr);
+        fetch(`/api/events?date=${dateStr}&limit=80`)
+            .then(res => res.json())
+            .then(data => {
+                rawEvents = Array.isArray(data) ? data : (data.data || []);
+                renderEvents();
+            })
+            .catch(err => {
+                eventList.innerHTML = `<div class="text-center text-danger py-4 small">Lỗi tải sự kiện: ${err.message}</div>`;
+            });
+    }
+
+    function renderEvents() {
+        const filtered = rawEvents.filter(ev => activeLabel === 'all' || (ev.label || '').toLowerCase() === activeLabel);
+        totalEventsCount.textContent = filtered.length;
+
+        if (filtered.length === 0) {
+            eventList.innerHTML = '<div class="text-center text-secondary py-5 small">Không có sự kiện nào trong ngày này</div>';
+            return;
+        }
+
+        eventList.innerHTML = filtered.map((ev, idx) => {
+            const dt = ev.created_at ? new Date(ev.created_at) : new Date();
+            const hhmm = dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+            const hhmmss = dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            const dayMonth = `${dt.getDate()} tháng ${dt.getMonth() + 1}`;
+            const durText = formatDuration(ev.duration_sec);
+            const iconHtml = getObjectIcon(ev.label);
+            const camName = ev.camera || 'Hẻm 2A';
+            const snapUrl = `/api/events/${ev.event_id}/snapshot`;
+
+            return `
+                <div class="scrypted-event-row ${idx === 0 ? 'selected' : ''}" onclick="openEventModal('${ev.event_id}', '${camName}', '${ev.label}', '${hhmmss}', ${ev.score || 85}, this)">
+                    <div class="blue-playhead-line"></div>
+                    <div class="blue-playhead-badge">${dayMonth}<br>${hhmmss}</div>
+
+                    <div class="ev-left-info">
+                        <div class="ev-cam-title">${camName}</div>
+                        <div class="ev-time-str">${hhmm}</div>
+                        <div class="ev-duration-str">${durText}</div>
+                        <div class="ev-type-icons">${iconHtml}</div>
+                    </div>
+
+                    <img src="${snapUrl}" class="ev-right-thumb" loading="lazy"
+                         onerror="this.src='https://placehold.co/320x180/1e293b/94a3b8?text=${ev.label}'">
+                </div>
+            `;
+        }).join('');
+    }
+
+    function filterByLabel(label, btnEl) {
+        activeLabel = label;
+        document.querySelectorAll('.icon-chip').forEach(b => b.classList.remove('active'));
+        if (btnEl) btnEl.classList.add('active');
+        renderEvents();
+    }
+
+    datePicker.addEventListener('change', (e) => {
+        if (e.target.value) loadEvents(e.target.value);
+    });
+    document.querySelector('.pill-date-btn').addEventListener('click', () => {
+        if (typeof datePicker.showPicker === 'function') {
+            datePicker.showPicker();
+        }
+    });
+
+    document.getElementById('btnScrollLive').addEventListener('click', () => {
+        datePicker.value = todayStr;
+        loadEvents(todayStr);
+        eventList.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    document.getElementById('btnRefreshEvents').addEventListener('click', () => {
+        loadEvents(datePicker.value || todayStr);
+    });
+
+    let currentEvId = '';
+    function openEventModal(eventId, camName, label, timeStr, score, rowEl) {
+        document.querySelectorAll('.scrypted-event-row').forEach(r => r.classList.remove('selected'));
+        if (rowEl) rowEl.classList.add('selected');
+
+        currentEvId = eventId;
+        document.getElementById('modalTitle').textContent = `${camName} • ${label.toUpperCase()} (${timeStr})`;
+        document.getElementById('modalMeta').innerHTML = `
+            <span>Độ tin cậy: <b class="text-info">${score}%</b> | ID: <code>${eventId}</code></span>
+            <a href="/api/events/${eventId}/snapshot" target="_blank" class="text-info text-decoration-none"><i class="fa-solid fa-up-right-from-square me-1"></i>Mở link trực tiếp</a>
+        `;
+        toggleMedia('snap');
+        new bootstrap.Modal(document.getElementById('snapshotModal')).show();
+    }
+
+    function toggleMedia(mode) {
+        const img = document.getElementById('modalImg');
+        const vid = document.getElementById('modalVideo');
+        document.getElementById('tabBtnSnap').classList.toggle('active', mode === 'snap');
+        document.getElementById('tabBtnClip').classList.toggle('active', mode === 'clip');
+
+        if (mode === 'snap') {
+            vid.pause();
+            vid.style.display = 'none';
+            img.style.display = 'block';
+            img.src = `/api/events/${currentEvId}/snapshot`;
+        } else {
+            img.style.display = 'none';
+            vid.style.display = 'block';
+            vid.src = `/api/events/${currentEvId}/clip`;
+            vid.play().catch(() => {});
+        }
+    }
+
+    function stopClip() {
+        const vid = document.getElementById('modalVideo');
+        if (vid) vid.pause();
+    }
+
+    const configModal = new bootstrap.Modal(document.getElementById('configModal'));
+    const cfgMinScore = document.getElementById('cfgMinScore');
+    const cfgScoreVal = document.getElementById('cfgScoreVal');
+    const configAlert = document.getElementById('configAlert');
+
+    function openConfig() {
+        configAlert.classList.add('d-none');
+        fetch('/api/config/camera')
+            .then(r => r.json())
+            .then(cfg => {
+                document.getElementById('cfgCamName').value = cfg.camera_name || 'Hẻm 2A';
+                document.getElementById('cfgRtspUrl').value = cfg.rtsp_url || '';
+                cfgMinScore.value = cfg.min_score || 0.7;
+                cfgScoreVal.textContent = Math.round((cfg.min_score || 0.7) * 100) + '%';
+                const objs = cfg.objects || ['person', 'car', 'motorcycle', 'dog'];
+                document.querySelectorAll('.cfg-obj').forEach(cb => cb.checked = objs.includes(cb.value));
+                configModal.show();
+            });
+    }
+
+    document.getElementById('btnOpenConfigTop').addEventListener('click', openConfig);
+    document.getElementById('btnOpenConfigMain').addEventListener('click', openConfig);
+    cfgMinScore.addEventListener('input', e => cfgScoreVal.textContent = Math.round(e.target.value * 100) + '%');
+
+    document.getElementById('btnSaveConfig').addEventListener('click', () => {
+        const objs = [];
+        document.querySelectorAll('.cfg-obj:checked').forEach(cb => objs.push(cb.value));
+        fetch('/api/config/camera', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                camera_name: document.getElementById('cfgCamName').value.trim(),
+                rtsp_url: document.getElementById('cfgRtspUrl').value.trim(),
+                min_score: parseFloat(cfgMinScore.value),
+                objects: objs
+            })
+        })
+        .then(r => r.json())
+        .then(() => {
+            configAlert.className = 'alert alert-success py-2';
+            configAlert.textContent = 'Đã lưu cấu hình Camera thành công!';
+            configAlert.classList.remove('d-none');
+            setTimeout(() => configModal.hide(), 1000);
+        });
+    });
+
+    loadEvents(todayStr);
+    setInterval(() => {
+        if (datePicker.value === todayStr) {
+            loadEvents(todayStr);
+        }
+    }, 5000);
+</script>
+</body>
+</html>

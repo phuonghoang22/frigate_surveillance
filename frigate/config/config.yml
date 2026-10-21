@@ -1,0 +1,46 @@
+mqtt:
+  host: 172.16.0.201
+  port: 1883
+
+go2rtc:
+  streams:
+    cam_test:
+      - rtsp://172.16.10.125:8554/f6b39beeb1a84dfcd3
+
+detectors:
+  cpu1:
+    type: cpu
+
+objects:
+  track:
+    - person
+    - motorcycle
+    - car
+    - dog
+
+cameras:
+  cam_test:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/cam_test
+          input_args: preset-rtsp-generic
+          roles:
+            - detect
+            - record
+    detect:
+      fps: 5
+      enabled: true
+    snapshots:
+      enabled: true
+      bounding_box: true
+      retain:
+        default: 7
+    record:
+      enabled: true
+      continuous:
+        days: 3
+      motion:
+        days: 0
+
+version: 0.18-0

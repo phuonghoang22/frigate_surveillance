@@ -1,0 +1,11 @@
+{
+    "camera_name": "cam_svtech",
+    "rtsp_url": "rtsp://172.16.0.201:8554/cam_svtech",
+    "min_score": 0.8,
+    "objects": [
+        "person",
+        "car",
+        "motorcycle",
+        "dog"
+    ]
+}
